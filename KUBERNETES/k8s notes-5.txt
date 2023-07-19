@@ -1,0 +1,280 @@
+Namespaces in k8s:
+==================		
+In Kubernetes, namespaces provide a way to divide a cluster into virtual partitions or segments. 
+They act as a logical boundary that isolates and separates resources within a cluster.
+In Kubernetes,A cluster can be divided into multiple namespaces, and each namespace can have its own set of resources. 
+This helps organize and manage applications and services running in the cluster.
+By Default the pod what we have created will be created in "Default" namespace.
+
+Some important commands related to namespaces:
+==============================================
+kubectl get ns  --> List of name spaces
+kubectl create ns <name> --> To create namespace
+kubectl apply -f po.yml --namespace test  --> Create pod in ns
+kubectl get pods -n test --> to list pods in sn test.
+kubectl get pods --all-namespaces  --> To view the pods running in all namespaces.
+kubectl delete pod <pod_name> -n test  --> To delete pod from namespace test.
+kubectl api-resources  --> To check what all can be created inside namespace.
+kubectl delete ns <namesapce> --> To delete the name space
+kubectl config set-context --current --namespace=test --> To make test as default
+
+How to add namespace in yaml:
+============================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: thirdpod
+  namespace: test    --> Namespace name
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+
+Default namespaces available in k8s cluster:
+===========================================
+when we create k8s cluster then by default we can see 4 name spaces.
+             
+1)default
+This ns will get created when we try to create any object without mentioning namespace            
+2)kube-node-lease
+node lease is a mechanism for workers nodes to master about there health status and they are ready to take workloads.
+lease should be sent for every 60 secs,if lease is not renewed then master may be considered nodes as unhealthy or unresponsive.   
+3)kube-public
+serves as a central location for storing public resources that need to be accessed by all users and service accounts within a Kubernetes cluster.
+4)kube-system
+All the pods,management related stuff to create clusters are stored in kube-system   
+
+Uses of Deployment?
+1) If multiple teams working on deployments then we can create multiple name spaces for there project.
+2) Multiple environments app can be deployed in different namespaces.
+3) We can restrict the numbers of objects to get created in Namespaces.
+4) We can also provide resource limit in Namespaces.
+5) We can provide RBAC to namespaces for different users.
+
+Service DNS:
+===========
+In k8s service DNS, also known as the service discovery DNS, 
+is a built-in mechanism that allows communication between services using their names instead of their 
+IP addresses. Each service deployed in a Kubernetes cluster is assigned a DNS name that can be used by 
+other services to access it.
+
+The service DNS name follows a specific format:
+ <service-name>.<namespace>.svc.cluster.local.
+ 
+Use case: 
+We can use ServiceDNS to communicate between pods in two different namespaces.
+
+Ex:
+Create one pod in default namespace and attach a nodeport service to it.
+Create one pod is custom namespace and try to login to container and curl.
+
+Once created then connect to pod created in custom name space.
+kubectl exec -n test -it secondpod -- bash
+
+And then execute --> curl <servicename>
+it will get failed because of two different namespaces.
+We need to curl using ServiceDNS now --> curl <service-name>.<namespace>.svc.cluster.local
+
+Resource Quota in Namespace:
+===========================
+Resource quota in k8s helps us to enforce resource limits on namespace.
+We can restrict out namesapce with certain cpu,memory and storage.	 
+
+We have two types of resource quota.
+1) Resource based Quota.
+2) Compute based quota.
+
+Resource/object Based Quota:
+=====================
+In resource based quota we are going to set how many objects can be created in namespaces.
+Ex: pods,services,PVC,RS etc. which are supported by namespaces.
+
+Compute based Quota:
+====================
+In compute based quota we can restrict the namespace with certial CPU limits.
+
+How to create object based quota.yaml?
+=====================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-resource-quota
+spec:
+  hard:
+    pods: "2"
+
+How to apply quota?
+kubectl apply -f quota.yaml --namespace= test
+
+How to check the changes made?
+kubectl describe ns test
+
+How to create compute based quota.yaml?
+======================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: my-resource-quota
+spec:
+  hard:
+    requests.cpu: 0.5
+    requests.memory: 500Mi
+    limits.cpu : 1
+    limits.memory: 1Gi
+
+After creating compute based quota and trying to creating pod without any limits in podthen it will throw error.
+it is mandatory to create pod using limits for POD.
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: testpod
+
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+    resources:
+      requests:
+        memory: 250Mi
+        cpu: 0.1
+      limits:
+         cpu: 0.5
+         memory: 500Mi
+
+Note:
+If suppose we haven't set requests quota in pod then by default it will set the values configured in LIMITS.
+We can run our pod with setting Requests quota as well.		 
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: testpod
+
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+    resources:
+#      requests:
+#        memory: 250Mi
+#        cpu: 0.1
+      limits:
+         cpu: 0.5
+         memory: 500Mi
+		 
+Everytime adding resource requests and limits will be headache to add in YAML.
+TO avoid adding that each and everytime we can use LimitRange in k8s.
+
+LimitRange in k8s:
+==================
+The LimitRange resource in Kubernetes allows you to define default and maximum resource limits for 
+containers running within a namespace. 
+It helps ensure resource fairness and prevent containers from consuming excessive resources.		 
+
+How to create Limits:
+====================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: testlimit
+spec:
+  limits:
+    - default:
+        cpu: 200m
+        memory: 500Mi
+      type: Container
+	  
+How to check?
+kubectl describe ns test
+
+Now we can see the default request and limit is same.
+If we want to put different values then use the below yaml file
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: testlimit
+spec:
+  limits:
+    - default:
+        cpu: 200m
+        memory: 500Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 250Mi  
+      type: Container
+	  
+What is max and min in Limit range?
+===================================
+Min is used to allocate min amount of cpu and memory to a container.
+max is used to allocate max amount of cpu and memory to a container.
+
+Min should be always lesser or equal to default request.
+Max should be always greater or equal to default limit.
+
+Example:
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: testlimit
+spec:
+  limits:
+    - default:
+        cpu: 200m
+        memory: 500Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 250Mi
+      min:
+        cpu: 100m
+        memory: 250Mi
+      max:
+        cpu: 500m
+        memory: 700Mi   
+      type: Container
+
+What is Max Limit/Request Ratio?
+===============================
+This will helps us to fix a ratio between max limit and max request.
+
+If suppose the Max Limit/Request ratio is set as 2
+and our max limit = 1000 and max request = 100 then
+1000/100 = 10 : value we have set is MAX 2 then it will not create the pod.
+
+How to set Max Limit/Request Ratio?
+==================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: testlimit
+spec:
+  limits:
+    - maxLimitRequestRatio:
+        memory: 2
+      type: Container
+	  
+Now try to create a pod using below yaml and it will get failed.
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: testpod
+
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+    resources:
+      requests:
+        memory: 100Mi
+      limits:
+        memory: 1000Mi

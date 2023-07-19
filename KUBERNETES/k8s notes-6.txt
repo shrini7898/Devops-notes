@@ -1,0 +1,382 @@
+Config Maps:
+===========
+ConfigMaps in Kubernetes are used to store non-sensitive configuration data that 
+can be consumed by pods or other Kubernetes objects. They provide a way to decouple 
+configuration from application code, making it easier to manage and update configurations without 
+redeploying the application
+
+How to create configmap using imperative command:
+=================================================
+kubectl create cm <Config_map_name> --from-literal=database_ip=192.168.0.1
+
+How to check the configmaps:
+kubectl get cm
+kubectl describe configmap <config_map_name>   --> Details of configmaps
+
+if you want to add multiple details in configmaps then
+kubectl create cm <Config_map_name> --from-literal=database_ip=192.168.0.1 --from-literal=database_name=test
+--from-literal=database_password=test123
+
+If suppose we have 50 properties then it will be difficult to add them using --from-literal,
+so we have --from-file which can be used in such cases.
+
+Example:
+Create a directory configmaps
+Create a file with name application.properties and add all the properties.
+Create a configmap using the below command
+kubectl create cm <Config_map_name> --from-file=<file_name>  
+
+How to create multiple cm from multiple files?
+kubectl create cm <Config_map_name> --from-file=<file_name> --from-file=<File_name>
+
+If suppose we have 50 files then it will be difficult to add them using --from-literal,--from-file
+so we have --from-directory which can be used in such cases.
+
+Example:
+Create a directory properties
+Create multiple files with anyname add all the properties.
+Create a configmap using the below command
+kubectl create cm <Config_map_name> --from-file=<folder_name>
+
+Config maps using env file?
+In env file the varibale name should not start with any numberic letter.
+How to create a configmap using env file?
+Create a file env.sh and add some details as given below
+#environment variables
+
+variable1=value1
+variable2=value2
+
+Execute below command to create one configmap
+kubectl create cm evn --from-env-file=env.sh
+
+Difference between --from-file and --from-env-file?
+In env-file the data count will be number of variables we have passed and also it will not consider spaces and
+filename.
+In from-file we can see the data count as 1 only because it copy the complete content of the file.
+
+ConfigMap from YAML:
+===================
+Quicly write any file by using -o yaml.
+kubectl create cm configmap --from-literal=database_ip=192.168.0.1 --dry-run=client -o yaml > config.yaml
+
+Literal configmap yaml file:
+============================
+apiVersion: v1
+data:
+  key1: value1
+  key2: value2
+  key3: value3
+kind: ConfigMap
+metadata:
+   name: configmap
+   
+File Configmap yaml file:
+=========================
+Quicly write any file by using -o yaml.
+kubectl create cm configmap --from-file=application.properties --dry-run=client -o yaml > config.yaml
+apiVersion: v1
+data:
+  application.properties: |
+    #environment variables
+
+    variable1=value1
+    variable2=value2
+kind: ConfigMap
+metadata:
+  name: configmap
+ 
+Directory configmap yaml file:
+==============================
+kubectl create cm configmap --from-file=properties --dry-run=client -o yaml > config.yaml 
+
+apiVersion: v1
+data:
+  test1: "#environment variables from file test1\r\n\r\nvariable1=value1\r\nvariable2=value2\r\n"
+  test2: "#environment variables from file test2\r\n\r\nvariable1=value1\r\nvariable2=value2"
+kind: ConfigMap
+metadata:
+  name: configmap
+
+Env.sh configfile yaml file:
+===========================
+kubectl create cm configmap --from-env-file=env.sh --dry-run=client -o yaml > config.yaml
+apiVersion: v1
+data:
+  variable1: value1
+  variable2: value2
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: configmap  
+
+Inject Configmaps in pods:
+==========================
+We can find our config maps in two ways inside our pod
+1) As env variables.
+2) As files
+
+Inject CM as env varibales:
+==========================
+1) Create config map using env.sh
+kubectl create cm env --from-env-file=env.sh
+2) Pod definition using configmap.
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never            #It will not try to pull the latest image from internet
+    env:     
+     - name: variablefromcm           #name of environemnt variable
+       valueFrom:         
+         configMapKeyRef: 
+           key: variable2             #In key which variable vallue you want to store.
+           name: env                  #Config map name
+		   
+How to test this ?
+kubectl exec -it firstpod env
+
+If we want to inject multiple values?
+===================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    env:
+     - name: variablefromcm
+       valueFrom:
+         configMapKeyRef:
+           key: variable2
+           name: env
+     - name: variablefromcm2
+       valueFrom:
+         configMapKeyRef:
+           key: variable1
+           name: env      		   
+How to inject all values of cm into pod?
+========================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    envFrom:           #To get all the values as environemnt variables inside pod of configmap env
+      - configMapRef:
+          name: env
+
+Inject config maps as files:
+============================
+If suppose we need to copy the varibales inside a pod as a file then we can use comfigmaps as files.
+This to be copied interms of volumes.
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    volumeMounts:                #mount point of volume
+      - mountPath: "/config"      #directory inside pod where the variables will be copied
+        name: test                #name of our volume
+        readOnly: true     
+  volumes:
+    - name: test                  #volume name
+      configMap:
+        name: env                #config map name
+		  
+If you want to inject specific variable as files in pod:
+=======================================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    volumeMounts:
+      - mountPath: "/config"
+        name: test
+        readOnly: true
+  volumes:
+    - name: test
+      configMap:
+        name: env
+        items:
+          - key: varibale1
+            path: "variablehere"
+			
+Secrets:
+=======
+Secrets in k8s is used to store small amount of secure data like passwords.
+Small amount of data can be upto 1MB of size.
+When ever we try to create any secret then it will be converted into base64 and stored.
+Secrets Will be again of 3 types:
+1) Docker-registry
+2) Generic
+3) tls
+
+Most commonly used will be generic.
+
+Secrets can be created in different ways same as configmaps like
+--from-literal
+--from-file
+--from-env-file and 
+from directory.
+
+How to create a secret?
+kubectl create secret generic <secret_name> --from-literal=name=sabair
+
+Kubectl get secrets --> to get the list of secrets.
+kubectl describe secret <secret_name> --> To view the details of secret
+kubectl get secret <secret_name> -o yaml --> To see a basic yaml file related to secret.
+
+kubectl create secret generic <secret_name> --from-file=<file_name>
+kubectl create secret generic <secret_name> --from-file=<folder_name>
+kubectl create secret generic <secret_name> --from-env-file=env.sh
+
+How to get the encoded value ?
+echo -n "Value" | base64
+
+How to create secrete using yaml?
+kubectl create secret generic first --from-literal=name=sabair --from-literal=password=Devops@123 --dry-run=client  -o yaml
+
+apiVersion: v1
+data:
+  name: c2FiYWly
+  password: QWxpbmFAMDUwOQ==
+kind: Secret
+metadata:
+  name: first
+  
+How to inject secret in pod as environments?
+===========================================  
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never            #It will not try to pull the latest image from internet
+    env:     
+     - name: variablefromSecret           #name of environemnt variable
+       valueFrom:         
+         secretKeyRef:
+           key: password             #In key which variable vallue you want to store.
+           name: first                 #Secret  name
+		   
+If we want to inject multiple values?
+===================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never            #It will not try to pull the latest image from internet
+    env:     
+     - name: password           #name of environemnt variable
+       valueFrom:         
+         secretKeyRef:
+           key: password             #In key which variable vallue you want to store.
+           name: first                 #Secret  name
+     - name: name           #name of environemnt variable
+       valueFrom:         
+         secretKeyRef:
+           key: name            
+           name: first           	   
+
+How to inject all values of secrets into pod?
+========================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    envFrom:                         #To get all the values as environemnt variables inside pod of secret env
+      - secretRef:
+          name: env		   
+
+Inject Secrets as files:
+============================
+If suppose we need to copy the varibales inside a pod as a file then we can use secrets as files.
+This to be copied interms of volumes.
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    volumeMounts:                #mount point of volume
+      - mountPath: "/secret"      #directory inside pod where the variables will be copied
+        name: test                #name of our volume
+        readOnly: true     
+  volumes:
+    - name: test                  #volume name
+      secret:
+        secretName: first              #Secret name		 
+
+If you want to inject specific variable as files in pod:
+=======================================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    imagePullPolicy: Never
+    volumeMounts:                #mount point of volume
+      - mountPath: "/secret"      #directory inside pod where the variables will be copied
+        name: test                #name of our volume
+        readOnly: true     
+  volumes:
+    - name: test                  #volume name
+      secret:
+        secretName: first              #Secret name	
+        items:
+          - key: password             #secret name
+            path: password	 

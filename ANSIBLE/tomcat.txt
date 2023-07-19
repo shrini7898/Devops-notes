@@ -1,0 +1,91 @@
+FROM alpine:3.12
+MAINTAINER shrini-tomcat
+
+# Set environment variables
+ENV TOMCAT_VERSION 9.0.76
+ENV CATALINA_HOME /usr/local/tomcat
+
+# Install dependencies and download Tomcat
+RUN apk --no-cache add curl && \
+    curl -O https://dlcdn.apache.org/tomcat/tomcat-9/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz && \
+    tar -xvf apache-tomcat-${TOMCAT_VERSION}.tar.gz && \
+    mv apache-tomcat-${TOMCAT_VERSION} ${CATALINA_HOME} && \
+    rm apache-tomcat-${TOMCAT_VERSION}.tar.gz && \
+    apk del curl
+
+# Install OpenJDK
+RUN apk --no-cache add openjdk8
+
+# Expose Tomcat port
+EXPOSE 8080
+
+# Start Tomcat
+CMD ["catalina.sh", "run"]
+
+------------------------------------------------------------------------------------------------------
+
+FROM alpine:3.12
+MAINTAINER shrini-tomcat
+RUN mkdir /usr/local/tomcat
+wORKDIR /usr/local/tomcat
+RUN apk --no-cache add curl && \
+ apk add --update curl && \
+     curl -O https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.76/bin/apache-tomcat-9.0.76.tar.gz
+RUN tar xvfz apache*.tar.gz
+RUN mv apache-tomcat-9.0.76/* /usr/local/tomcat
+RUN rm -rf apache-*
+RUN apk update && apk add openjdk8
+WORKDIR /usr/local/tomcat
+EXPOSE 8080
+CMD ["/usr/local/tomcat/bin/catalina.sh","run"]
+
+--------------------------------------------------------------------------------------------------------
+# Stage 1: Builder stage
+FROM alpine:3.12 AS builder
+
+# Set environment variables
+ENV TOMCAT_VERSION 9.0.76
+ENV CATALINA_HOME /usr/local/tomcat
+
+# Install dependencies and download Tomcat
+RUN apk --no-cache add curl && \
+    curl -O https://dlcdn.apache.org/tomcat/tomcat-9/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz && \
+    tar -xvf apache-tomcat-${TOMCAT_VERSION}.tar.gz && \
+    mv apache-tomcat-${TOMCAT_VERSION} ${CATALINA_HOME} && \
+    rm apache-tomcat-${TOMCAT_VERSION}.tar.gz && \
+    apk del curl
+
+# Stage 2: Final image
+FROM alpine:3.12
+
+# Copy Tomcat from the builder stage
+COPY --from=builder /usr/local/tomcat /usr/local/tomcat
+
+# Expose Tomcat port
+EXPOSE 8080
+
+# Set the working directory
+WORKDIR /usr/local/tomcat
+
+# Install OpenJDK
+RUN apk --no-cache add openjdk8
+
+# Start Tomcat
+CMD ["./bin/catalina.sh", "run"]
+
+---------------------------------------------------------------------------------------------------------------------
+FROM alpine:3.12
+MAINTAINER <Your_Name>
+RUN mkdir /usr/local/tomcat/
+WORKDIR /usr/local/tomcat
+RUN apk --no-cache add curl && \ 
+    apk add --update curl && \ 
+	curl -O https://mirrors.sonic.net/apache/tomcat/tomcat-8/v8.5.61/bin/apache-tomcat-8.5.61.tar.gz
+RUN tar xvfz apache*.tar.gz
+RUN mv apache-tomcat-8.5.61/* /usr/local/tomcat/.
+RUN rm -rf apache-*
+COPY sample.war /usr/local/tomcat/webapps
+RUN apk update && apk add openjdk8
+WORKDIR /usr/local/tomcat
+EXPOSE 8080
+

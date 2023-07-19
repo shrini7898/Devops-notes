@@ -1,0 +1,158 @@
+Kubernetes:
+===========
+Minikube:
+========
+Minikube is a single cluster with all k8s component.
+minikube is used for learning and development purposes.
+
+Install minikube on windows:
+===========================
+1) Install Docker on windows.
+https://docs.docker.com/desktop/install/windows-install/
+2) Install Oracle box on windows
+https://adamtheautomator.com/install-virtualbox-on-windows-10/
+3) Check system info in CMD
+systeminfo
+4) Install Minikube using powershell
+https://minikube.sigs.k8s.io/docs/start/
+5) Set the minikube path to environmental varaible
+6) Restart powershell and start minikube
+minikube start
+
+
+To check minikube ip use : minikube ip
+To ssh to minikube: minikube ssh
+To connect or check the pods : kubectl get pods
+To see minikube on dashboard: minikube dashboard
+
+Setup 3 nodes k8s cluster,1 master and 2 node machines:
+======================================================
+1) launch 3 instances of type t2.medium and linux2 AMI.
+2) Disable swap memory from instances.(Because k8s wants the cpu to utilized 100%)
+free - h to check the swap memeory allocated
+swapoff -a to off the swap memory
+To not enable this after restart then comment this in fstab file.
+3) Install docker based on Operating system in 3 instances.
+https://docs.docker.com/engine/install/
+4) To setup k8s cluster we have different tools like kops and kubeadm.
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+5) Now we need to setup networking and configure master and worker nodes.
+https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
+6) TO configure master we need to initialize with CIDR
+kubeadm init --pod-network-cidr=10.244.0.0/16
+7) To start using your cluster, you need to run the following as a regular user:
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+8) If we execute kubectl get nodes we can see the status as notready because we haven't installed flannel
+9) Install Flannel and check the status of nodes  
+kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+10) Now copy the token and execute on worker machines.
+
+
+What is kubernetes:
+==================
+Kubernetes is also called as k8s.
+k8s is an open source popular orchestration tool developed and used by google in prod env.
+We have different orchestration technologies like dockerswarm,kubernets and 
+mesos.
+
+Advantages of k8s:
+==================
+With the help of orchestration our application is highly available, as it is deployed on multiple instances.
+we can scale up the cluster if demand increase and also scale up nodes if we are out of resources.
+
+Basic k8s components:
+====================
+Pod: Is the smallest unit of k8s,a pod can contain one container,multiple
+container,one container and one volume.
+Ip will be assigned to POD.
+
+ReplicaSet: Ensures the number of pods running on node machines.
+If suppose any one pod is not healthy then RS will monitor and create new POD.
+
+Deployments:Deployments are used to deploy,upgrade,undo the changes,pausing and again resuming the changes.
+Deployments use rolling update means the new version will be slowing updated with the older version
+and the users will be able to access our application without downtime.
+
+Hierarchy for deployment:
+pods --> replicasets --> Deployment
+
+Namespaces: These are used to group your applications.
+They can be helpful when different teams or projects share a Kubernetes cluster.
+
+services: Service will help us to redirect the traffic to PODS.
+
+Kubernetes Architecture:
+=======================
+We have two Kind of machines in k8s.
+1) Master
+2) Worker node
+
+Again we have different components on master and worker nodes.
+
+Master Components:
+==================
+1) Kube api server
+2) etcd
+3) Controller
+4) Scheduler
+
+worker node components:
+=======================
+1) Docker container runtime
+2) Kubelet agent
+3) Kubeproxy
+
+Note: kubectl is a command line tool to execute k8s commands.
+
+Api server: Acts as frontend of k8s,Authenticate user,authorization and api server is the only gateway to communciate with our k8s cluster.
+Etcd: Cluster brain,which stores the information related to cluster,node in the form of key value pair.
+Scheduler: Responsible to schedule pods on the node machine.
+Controller manager: controller is the brain behind orchestration,if nodes,container,endpoint goes down then controller will work behind to bring them up.
+Container runtime: any container service to start,stop container (Docker).
+kubelet: Kubelet run on all the machines,kubelet make sure that the containers are running as expected on node machines.
+KubeProxy: It maintains network rules on your nodes and enables network communication to your Pods.
+
+How to Create a pod:
+===================
+pods: pod is the smallest unit in k8s.
+pod will have atleast one container.
+
+Multi container pods:
+we can have multiple container in one pod.
+one container with application and another container will be helper container.
+Helper container: this will be deployed along with our application,helper container will help
+our application with any processing/functionality.
+
+Kubectl run firstpod --generator=run-pod/v1 --image=nginx
+
+Firstpod = name of pod
+generator = to specify to create pod,if not specified then it will create deployment
+image = docker image
+Note: Generators might be deprecated
+
+commands for pods:
+==================
+kubectl run nginx --image=nginx --> to run a pod with name nginx and image nginx
+kubectl get pods --> to display the list of pods
+kubectl describe pod nginx --> Detail information of the pod created.
+kubectl get pods -o wide --> additional information of pod like node,ip etc 
+kubectl explain pods -->Detailed description of pods
+kubectl get pods -w --> Continously watch the status of POD
+kubectl delete pod pod_name --> To delete the pod
+kubectl delete resourcetype resourcename
+kubectl run nginx --dry-run=client --image=nginx --> To check how the command will execute.
+kubectl delete pods --all --> Delete all pods
+Labels:
+Labels are key-value pairs which are attached to pods, 
+replication controller and services. They are used as identifying 
+attributes for objects such as pods and replication controller. 
+They can be added to an object at creation time and can be added or modified at the run time.
+
+kubectl describe pod <pod_name> --> to check the label attached
+kubectl label pod firstpod env=test --> To attach label env=test
+kubectl label --overwrite pod firstpod env=prod --> To update the label env
+kubectl label pod firtpod env- --> To delete the label env
+Kubectl label pods -all status=xyz --> To update the label to all pods
+kubectl get pods --show-labels --> to check labels

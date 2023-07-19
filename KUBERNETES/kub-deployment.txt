@@ -1,0 +1,306 @@
+Deployments:
+===========
+Deployments are used to deploy,upgrade,undo the changes,pausing and again resuming the changes.
+Deployments use rolling update means the new version will be slowing updated with the older version
+and the users will be able to access our application without downtime.
+
+Hierarchy for deployment:
+pods --> replicasets --> Deployment
+
+Deployment strategy:
+===================
+There are two types of depoyment strategy in k8s.
+1) Recreate
+This will destroy the existing pods and create new.
+We can see downtime in recreate deployment strategy
+2) Rolling update 
+This is the default deployment strategy.
+No downtime for rolling update strategy.
+For example if we have 5 pods then 1 will be destroyed and a newver version will be 
+created and 4 will be servering the traffic.
+In this way it will destroy all the 5 and create new 5 pods slowly.
+
+we can see the difference when we use kubectl describe deployment deployment_name command
+In recreate it will scale down the RS to 0 and then Scale up to 5.
+In Rolling it will scale down to 4 and and bring one new up and then vice versa
+
+Create First Deployment:
+=======================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firstdeployment
+  labels:
+    appname: testapp
+
+spec:
+  replicas: 3
+  selector:
+    matchExpressions:
+      - key: env
+        operator: In
+        values: 
+          - prod
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname
+
+Commands:
+kubectl create -f deploymen.yml --> Create deployment.
+kubectl get deployments --> To get the list of deployments.
+kubetl apply -f deployment.yml --> To update deployment.
+kubectl rollout status deployment/myapp-deployment.yml --> to check the status of deployments.
+kubectl rollout out deployment/myapp-deploy  --> Rollback to previous version		  
+
+Updates and Rollback:
+=====================
+Rollout and versioning:
+when we create deployment then a rollout is created and a Revision is created.
+When we again update the deployment then again a rollout will be carried and New Revision is created.
+These revisions are helpful when we want to rollback to previous version.
+
+Note: Rollout will get triggered only when there are change in the container configurations only.
+
+How to check the status of rollout?
+kubectl rollout status deployment <Deployment_name>
+
+Maxunavailable and MaxSurge in Deployment:
+==========================================
+Maxunavailable means the number of unaavailable pods at the time of update. 
+If we configure Maxunavailable as 1 then it will create one new and delete one old.
+If 5 as value then create 5 and delete 5.
+This will help us to complete the deployment faster.
+
+Max Surge: This will imply the number of pods that will be there on top of total replicas being mentioned. 
+Example if the replicas in the deployment is mentioned as 3, when rolling update will kick in this property 
+will define how many extra pods will be created at that point of time.
+
+how to configure this?
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firstdeployment
+  labels:
+    appname: testapp
+
+spec:
+  replicas: 6
+  minReadySeconds: 30        --> It will take 30 seconds to start a new container.
+  strategy:
+    rollingUpdate:          --> Strategy used for deployment
+      maxSurge: 2            --> 2 extra pods (Replica 6 and maxsurge 2 then it will be 8 pods)
+      maxUnavailable: 1        --> 1 pod will create and get deleted
+  selector:
+    matchExpressions:
+      - key: env
+        operator: In
+        values: 
+          - prod
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname
+Note: Maxunavailable and Max surge value can be passed in percentage also.
+
+What will be the Maxunavailable,MaxSurge,MinReady Seconds and strategy if not mentioned in deployment?
+Strategy: RollingUpdate
+MinReady Seconds: 0
+Max surge and Max unavailable: 25%
+For example we have 100 pods then 25 pods will be selected.
+
+How to check the history of deployment?
+kubectl rollout history deployment <Deployment_name>
+Output:
+PS C:\Users\0075\Desktop\k8spractical> kubectl rollout history deployment firstdeployment
+deployment.apps/firstdeployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+
+From above output we can see revision as 1 means firstrollout and change-cause <none> because we haven't added
+any annotations in deployment.yaml
+
+To test we can add annotations from command or we need to add in yaml
+kubectl apply -f .\deployment.yaml --record=true
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firstdeployment
+  labels:
+    appname: testapp
+  annotations:
+    kubernetes.io/change-cause: Custom message    
+
+spec:
+  replicas: 4
+  
+  selector:
+    matchExpressions:
+      - key: env
+        operator: In
+        values: 
+          - prod
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname
+		  
+Output:
+PS C:\Users\0075\Desktop\k8spractical> kubectl rollout history deployment firstdeployment
+deployment.apps/firstdeployment 
+REVISION  CHANGE-CAUSE
+1         Custom message
+ 
+K8s Rollback:
+============
+Rollback will helps us to get back to old version of deployment.
+
+How to do the rollback?
+kubectl rollout undo deployment <deployment_name>
+This will roll back to previous version.
+
+If you want to rollback to specific version?
+kubectl rollout undo --to-revision=2 deployment <deployment_name>
+
+How to pause and resume deployment?
+kubectl rollout pause deployment <Deployment_name>
+kubectl rollout resume deployment <Deployment_name>
+
+Max number of revision that can be created in deployment?
+10 
+
+How to change the revision limit history in deployment?
+Example :
+---------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-first-deployment
+  labels:
+    app: myapp
+spec:
+    replicas: 5
+    revisionHistoryLimit: 15   
+
+Recreate Strategy:
+=================
+By using recreate strategy we can see some down time,as recreate will delete all the pods at once and 
+create new one.
+
+How to configure recreate strategy in YAML?
+==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firstdeployment
+  labels:
+    appname: testapp
+
+spec:
+  replicas: 6
+  strategy:
+        type: Recreate      -->Recreate Deployment     
+
+  selector:
+    matchExpressions:
+      - key: env
+        operator: In
+        values: 
+          - prod
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname 
+
+Resource Request:
+================
+When we schedule a pod on any node without any resource request then it will automatically take the resource
+available on the node.
+Resource request will be RAM and CPU request.
+
+Why do we use resource request ?
+If suppose our pod needs 200MB of RAM then scheduler will check on which node the RAM is available 
+and then it will schedule the pod on that node only.
+
+Where to configure resource request?
+===================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: thirdpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+    resources:
+      requests:
+        memory: 100M    --> 100 MB of RAM
+        cpu: 1		--> 1 core of CPU  
+		
+Note:
+CPU:
+requests.cpu: The amount of CPU resources the container requests. It can be specified in millicores (m) or cores (1).
+limits.cpu: The maximum amount of CPU resources the container can use.
+
+Memory:
+requests.memory: The amount of memory the container requests. It can be specified in bytes (B), kilobytes (Ki), megabytes (Mi), or gigabytes (Gi).
+limits.memory: The maximum amount of memory the container can use. 
+
+Resource Limits:
+===============
+Resource limit will ensures that container is not using more than the specified RAM and CPU.
+
+Example template:
+===============
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: thirdpod
+  labels:
+    env: prod
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+    resources:
+      requests:
+        memory: 100M
+        cpu: 1
+      limits:
+        cpu: 2 
+        memory: 200M

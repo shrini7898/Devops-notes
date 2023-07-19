@@ -1,0 +1,261 @@
+Services in k8s:
+===============
+Services are used to expose our pods to outside world.
+For example we have deployed a apache webserver and want to access from our computer/outside network
+then it is possible with services only.
+services are also a object like nodes,pods in k8s.
+Default service will be ClusterIp in k8s.
+if we dont specify type in spec then it will assume as ClusterIp only.
+
+Three types of services are available on k8s.
+1) ClusterIp
+2) Nodeport
+3) Load balancer
+
+CLusterIp:
+Cluster ip is used to communicate within the cluster.
+we may have some pods running frontent,backend and database.
+And in micro services frontent will be talking to backend and databases.
+we can create a service for backend and database and group the pods related to Microservice.
+Each service will have a ip and we call it as ClusterIp which help to communciate with other services
+
+How to create cluster ip service?
+Create one pod using yaml and then create one service by using the below command
+kubectl expose pod <Pod_name> --port=8000 --target-port=80 --name <service_name>
+kubectl get services --> To list the services available.
+
+We can test by using the below command
+curl <CLuster_ip>:8000
+
+NodePort:
+NodePort is used to access for pod outside the world,means via browser.
+Port can be assigned between (30000 - 32767)
+
+How to create NodePort?
+kubectl expose pod firstpod --type=NodePort --port=8000 --target-port=80 --name nodeportservice
+ 
+How services will work?
+Services will check the request which is sent on port and redirect that based on label.
+
+service.yml
+===========
+apiVersion: v1
+kind: Service
+metadata:
+  name: firstservice
+spec:
+  type: NodePort
+  ports:
+    - nodePort: 32000
+      port: 9000
+      targetPort: 80
+  selector:
+    type: app
+
+Target port and nodeport are optional.
+Nodeport it will assign based on port available betweent the range.
+Target port it will take same as port.
+If we have multiple cluster the same service will work as distributing load.
+Algorith to distribute load : Random
+If we have multiple nodes then the service will be mapped on all the node and it can be used on same port with nodeip.
+example: 192.168.0.1:30008
+         192.168.1.0:30008	
+
+Replication Controller:
+======================
+Replciation controller or RC will ensure that these many pods are running on the cluster.
+For any reason if the pod is down then RC will monitor that and spin up a new pod for us.
+RC will get attached to the pods based on labels and selectors.
+
+How to create a RC?
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: firstrc
+  labels:
+    appname: testapp
+
+spec:                              --> Related to RC
+  replicas: 5
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec:                         --> Related to Pod
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname
+
+RC will always make sure to maintain 5 pods based on above yaml.
+Now we can create a service and attach the service based on labels and then service will help
+us to redirect the traffic to pods.
+
+Service.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: firstservice
+spec:
+  type: NodePort
+  ports:
+    - nodePort: 32000
+      port: 9000
+      targetPort: 80
+  selector:
+    env: prod
+
+How to create RC?
+kubectl create -f service.yml		  
+
+Why do we need Labels and selectors?
+If suppose we have 100 of containers running then labels and selectors will help
+RS to filter the containers and apply monitoring based on labels and selectors.
+
+Will RS can be configured to the existing running pods?
+yes we can configure RS to running containers by defining the selectors in RS.yml
+
+How to delete rc?
+kubectl delete rc <name_of_rc>
+
+How to delete on rc and the pods should be running?
+kubectl delete rc --cascade=false <name_of_rc>
+
+This will only delete rc and pods will be running,if pod is deleted then they will not restart as
+we dont have any rc configured.
+
+How to scale up/scale down using Rc?
+
+We can scale up and scale down using command or yaml
+1)kubectl scale rc --replicas=6 <rc_name> -->imeprative commands
+2) using imperative object configuration using edit
+kubect edit rc <rc_name>
+3) Declarative object configuration
+make the changes in yaml file and use the below apply command
+kubectl apply -f <file_name.yml>
+
+How to scale up/scale down automatically using rc?
+Rc will first check if any pod with label is available or not and if available
+then it will check for the owner or someone controlling the pod.
+if no one is controlling the pod then rc will be assigned to that pod.
+
+if we create new rc with same label then a new pod will be created as the existing pod has already 
+assigned with rc.
+
+We can also configure the selector in rc yaml file.
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: firstrc
+  labels:
+    appname: testapp
+
+spec:
+  replicas: 4
+  selector:           --> Selector (not compulsory to pass in RC) should be same of pod label
+    env: prod          ## if we dont pass selector field then it will take the labels in count by default.
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname
+
+Replica set:
+===========
+RS and RC both purpose is same but they are not same.
+RC is older technology and k8s recommend to use RS.
+RS is just the updated version of RP.
+	
+Replication controller vs Replica set Difference?
+================================================
+RC and RS functionality is almost similar.
+RC will work based on eqality based selector.
+Ex: env = prod
+RC selects all resources with key equal to env and value equal to prod.
+RS will work based on equality based selector and set based selector.
+Ex: env = (prod,test)
+RS selects all resources with key equal to env and value equal to prod or test.
+
+How to create RS?
+================
+We can get the details what needs to be added by explain command.
+kubectl explain rs --recursive|less
+In RS selector filed is mandatory and if not provided then will throw error.
+
+Let us create two pod one by label "Prod" and one by label "test"
+
+rs.yaml:
+=======
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: firstrc
+  labels:
+    appname: testapp
+
+spec:
+  replicas: 2
+  selector:
+    matchExpressions:
+      - key: env
+        operator: In      #value can be In or NotIn only
+        values: 
+          - prod
+          - test
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname
+
+If Suppose we have 3 pods now with label one as "prod","test" and one pod with two labels "prod" and "backend"
+and we want to ignore a specific pods then how can we use this rs.
+
+rs.yaml:
+=======
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: firstrc
+  labels:
+    appname: testapp
+
+spec:
+  replicas: 3
+  selector:
+    matchExpressions:
+      - key: env
+        operator: In
+        values: 
+          - prod
+          - test
+      - key: type
+        operator: NotIn   #ignore the pod with label as backend
+        values: 
+          - backend  
+  template:
+    metadata: 
+      name: firstpod
+      labels:
+        env: prod
+    spec: 
+      containers: 
+      - name: firstcontainer 
+        image: nginx
+        env:
+          - name: myname

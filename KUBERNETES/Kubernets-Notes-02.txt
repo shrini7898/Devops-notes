@@ -1,0 +1,179 @@
+First YAML file:
+===============
+k8s definition filed contains four top level fileds.
+
+apiversion
+kind
+metadata
+spec
+====================
+kind       version
+=====================
+POD          v1
+service      v1
+ReplicaSet   apps/v1
+Deployment   apps/v1
+=====================
+
+Sample YAML file:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: firstpod
+  labels:
+    env: prod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+	
+TO create pod using yaml file:
+kubectl create -f <file_name>.yml --dry-run --> to check the output
+kubectl create -f <file_name>.yml
+
+How will we know what fields we can use in metadata and spec?
+We can get different options using
+kubectl explain pods --recursive
+kubectl run nginx --dry-run=client --image=nginx -o yaml
+
+To update any object in k8s we can use edit
+kubectl edit pod <podname>
+
+Difference between create and apply?
+kubectl supports three types of object management.
+1) Imperative commands --> Which are not created from yaml
+2) Imperative object configuration --> Kubectl create is example for imperative.
+3) Declarative object configuration --> Kubectl apply is example for declarative.
+
+Imperative : 
+You have to manage different resources like pods, service, replica sets, etc by your own.
+Imperative object configuration will helps us to modify the objects and these changes are not stored in yaml.
+The kubectl create command creates a resource from a file or from stdin. JSON and YAML formats are accepted. 
+If the resource already exists, kubectl create will error.
+
+Declarative : 
+K8 will take care of all the resources, all you need have to specify what is your actual requirement.
+Declarative object configuration will helps to modify the yaml file.
+The kubectl apply command applies a configuration to a resource by file name or stdin. The resource name must be specified.
+This resource will be created if it doesn't exist yet. If the resource already exists, this command will not error. JSON and YAML formats are accepted.
+
+Set Env Variables inside container Pods:
+=======================================
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+    name: sabair
+spec: 
+  containers: 
+  - name: nginx 
+    image: nginx
+    env:
+      - name: myname
+        value: sabair
+      - name: City
+        value: Hyderabad
+		
+How to check the environmental variables?
+login to the node where the container is running and execute the below command
+docker exec -it <container_id> env	
+
+How to check the variables using kubectl?
+kubectl exec <Pod_name> -- env --> If one container is runnind inside pod
+kubectl exec <pod_name> -c <container_name> -- env --> To run command in specific container
+kubectl exec <pod_name> -it bash --> To login inside the pod if one container is running
+kubectl exec <pod_name> -c <container_name> -it bash --> Login to specific container
+
+How to set command in pods containers?
+We can use argumnets in yaml to pass commands in containers.
+
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+    name: sabair
+spec: 
+  containers: 
+  - name: nginx 
+    image: nginx
+    env:
+      - name: myname
+        value: sabair
+      - name: City
+        value: Hyderabad
+    args: ["sleep", "50"]
+
+How to create multiple container in a pod?
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+    name: sabair
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+        value: sabair
+      - name: City
+        value: Hyderabad
+    args: ["sleep", "3600"]
+  - name: secondcontainer 
+    image: nginx
+
+Note: Both these containers will be sharing the same network and can communicate between themselves.
+How to verify?
+1) Use the exec command and login to both the containers.
+kubectl exec firstpod -it -c firstcontainer bash
+2) Check the open ports by using netstat -nltp	--> We can see port 80 is open in both cases
+3) Try to open port 8000 by using netcat -l -p 8000 
+4) verify againg using netstat -nltp command
+5) Use telnet localhost 8000 on second container and write any commands to verify
+
+What is init container in pods?
+Init containers are used if you want any container to execute before the app container starts.
+Init containers are exactly like regular containers, except:
+Init containers always run to completion.
+Each init container must complete successfully before the next one starts.
+Use case:
+1) If you have multiple containers and one container should download the code from github and the
+other container will start your application.
+2) if we have two containers one web applciation and one db,web applciation should start only after db
+then we can use init containers.
+
+How to create init container?
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: firstpod
+  labels:
+    env: prod
+    name: sabair
+spec: 
+  containers: 
+  - name: firstcontainer 
+    image: nginx
+    env:
+      - name: myname
+        value: sabair
+      - name: City
+        value: Hyderabad
+   - name: secondcontainer 
+    image: nginx
+  initContainers: 
+  - name: initcontainer 
+    image: nginx
+    env:
+      - name: myname
+        value: sabair
+      - name: City
+        value: Hyderabad
+    args: ["sleep", "30"] 

@@ -1,0 +1,27 @@
+sudo su
+vi awx.sh paste the script and run
+bash awx.sh
+#!/bin/bash
+
+# Update system packages
+sudo apt update
+sudo apt upgrade -y
+
+# Install dependencies
+sudo apt install -y git python3-pip docker.io docker-compose
+
+# Clone AWX repository
+git clone https://github.com/betawins/awx.git
+
+# Change directory to AWX installer
+cd awx/installer
+
+# Install Ansible and its dependencies
+apt install -y ansible
+apt install -y pwgen
+var=`pwgen -N 1 -s 30`
+echo $var
+sed -i 's/awxsecret/'$var'/g' /root/awx/installer/inventory
+echo "[all]" >> inventory
+echo "localhost" >> inventory
+ansible-playbook -i inventory install.yml
