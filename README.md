@@ -1,3 +1,7 @@
-# Devops-notes 
+# Devops-notes
+
 Topics: 
-LINUX,BASH-SCRIPTING,GIT&GITHUB,AWS,ANSIBLE,TERRAFORM,DOCKER,KUBERENTES,JENKINS,GRAFANA-DEPLOYMENT
+
+LINUX,BASH-SCRIPTING,GIT&GITHUB,AWS,ANSIBLE,TERRAFORM,DOCKER,KUBERENTES,JENKINS,GRAFANA-DEPLOYMENT,
+
+------------------------------------------------------------------------------------------------------
